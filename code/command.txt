@@ -1,0 +1,55 @@
+clang -ccc-print-phases main.c
+
+预处理：
+gcc -E main.c -o main.i
+编译：
+gcc -S main.i -o main.s
+汇编：
+gcc -c main.s -o main.o
+链接：
+gcc main.o -o main
+
+词法分析：
+clang -E -Xclang -dump-tokens main.c 2> tokens.txt #加2的原因是:-dump-tokens属于标准错误,不是标准输出
+语法分析：
+clang -E -Xclang -ast-dump main.c
+语义分析：
+中间代码生成：
+clang -S -emit-llvm main.c
+gcc -fdump-tree-all-graph main.c
+gcc -fdump-rtl-all-graph main.c
+llvm-as main.ll -o main.bc
+中间代码优化：
+opt -S -O0 main.ll -o main-O0.ll  # 无优化
+opt -S -O1 main.ll -o main-O1.ll  # 基础优化
+opt -S -O2 main.ll -o main-O2.ll  # 标准优化
+opt -S -O3 main.ll -o main-O3.ll  # 激进优化
+diff main.ll main-O1.ll #对比
+代码生成：
+gcc main.i -S -o main_x86.S # 生成 x86 格式目标代码
+riscv64-unknown-elf-gcc -march=rv64gc -mabi=lp64d main.c -S -o main_riscv.S #riscv64格式
+llc main.ll -o main_llvm.S # LLVM 生成目标代码
+汇编:
+gcc main_x86.S -c -o main_x86.o
+riscv64-unknown-elf-as -march=rv64gc -mabi=lp64d main_riscv.S -o main_riscv.o
+llc main.bc -filetype=obj -o main_llvm.o
+riscv64-unknown-elf-objdump -D main_riscv.o > main_riscv_r.s #反汇编
+链接：
+gcc main_x86.o -lstdc++ -o main_x86
+riscv64-unknown-elf-gcc main_riscv.o -o main_riscv
+clang main_llvm.o -o main_llvm
+riscv64-unknown-elf-objdump -D main_riscv > main_riscv_r_l.s #反汇编
+
+运行：
+qemu-riscv64 main_riscv
+
+echo 'export PATH=$PATH:/opt/qemu/bin:$PATH' >> ~/.bashrc
+export PATH=$PATH:/home/lin/workspace/riscv-elf-toolchains/bin
+
+riscv64-unknown-elf-gcc -c -o sylib.o sylib.c -w -static #生成sysY链接库
+riscv64-unknown-elf-ar rcs libsysy_riscv.a sylib.o
+
+riscv64-unknown-elf-gcc test2.s -c -o test2.o -w
+riscv64-unknown-elf-gcc test2.o -o test2 -static -fno-builtin -mcmodel=medany -Wl,--no-relax -Ttext=0x10000000 -L /home/lin/workspace/lib -lsysy_riscv
+
+riscv64-unknown-elf-nm /home/lin/workspace/lib/libsysy_riscv.a
