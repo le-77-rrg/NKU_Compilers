@@ -42,3 +42,14 @@ riscv64-unknown-elf-objdump -D main_riscv > main_riscv_r_l.s #反汇编
 
 运行：
 qemu-riscv64 main_riscv
+
+echo 'export PATH=$PATH:/opt/qemu/bin:$PATH' >> ~/.bashrc
+export PATH=$PATH:/home/lin/workspace/riscv-elf-toolchains/bin
+
+riscv64-unknown-elf-gcc -c -o sylib.o sylib.c -w -static #生成sysY链接库
+riscv64-unknown-elf-ar rcs libsysy_riscv.a sylib.o
+
+riscv64-unknown-elf-gcc test2.s -c -o test2.o -w
+riscv64-unknown-elf-gcc test2.o -o test2 -static -fno-builtin -mcmodel=medany -Wl,--no-relax -Ttext=0x10000000 -L /home/lin/workspace/lib -lsysy_riscv
+
+riscv64-unknown-elf-nm /home/lin/workspace/lib/libsysy_riscv.a

@@ -1,6 +1,4 @@
 .section .data
-fmt_in:     .string "%d"              # scanf 格式字符串
-fmt_out:    .string "%d\n"            # printf 格式字符串（用于 print 函数）
 error_msg:  .string "ERROR!\n"        # 错误提示字符串
 
 .section .text
@@ -13,9 +11,7 @@ add:
 print:
     addi sp, sp, -16  # 分配 16 字节栈空间（保持对齐）
     sd ra, 8(sp)      # 保存返回地址
-    mv a1, a0         # 将参数 result 移到 a1（printf 的第二个参数）
-    la a0, fmt_out    # 加载格式字符串地址
-    call printf       # 调用 printf
+    call putint       # 调用 sysY 的 putint 函数
     ld ra, 8(sp)      # 恢复返回地址
     addi sp, sp, 16   # 释放栈空间
     ret
@@ -24,7 +20,16 @@ print:
 putstr:
     addi sp, sp, -16  # 分配 16 字节栈空间
     sd ra, 8(sp)      # 保存返回地址
-    call printf       # 直接调用 printf，a0 包含字符串地址
+    # sysY 库没有直接的字符串输出函数，使用 putch 循环输出
+    mv t0, a0         # 保存字符串地址
+putstr_loop:
+    lb t1, 0(t0)      # 加载一个字符
+    beqz t1, putstr_end  # 如果遇到 0，结束
+    mv a0, t1         # 将字符作为参数
+    call putch        # 输出字符
+    addi t0, t0, 1    # 移动到下一个字符
+    j putstr_loop
+putstr_end:
     ld ra, 8(sp)      # 恢复返回地址
     addi sp, sp, 16   # 释放栈空间
     ret
@@ -48,11 +53,8 @@ main:
     li s3, 1          # i = 1
 
     # 读取 n
-    la a0, fmt_in
-    addi a1, sp, 8    # 为 scanf 分配 4 字节空间（sp+8）
-    call scanf
-    lw s0, 8(sp)      # 加载 n 到 s0
-    sext.w s0, s0     # 符号扩展 32 位到 64 位
+    call getint       # 调用 sysY 的 getint 函数
+    mv s0, a0         # 将输入的 n 保存到 s0
 
     # 处理 n < 0
     bgez s0, check_zero  # 如果 n >= 0，跳转到检查 n == 0
@@ -78,26 +80,30 @@ fib_start:
     mv a0, s1
     call print
 
+    # 打印换行符
+    li a0, 10           # '\n' 的 ASCII 码
+    call putch
+
     # 打印 a[1]
     mv a0, s2
     call print
 
+    # 打印换行符
+    li a0, 10           # '\n' 的 ASCII 码
+    call putch
 
     # 循环
 loop:
-    bge s3, s0, end   # 如果 i >= n，结束
-    mv s4, s2         # t = a[1]
-    mv a0, s1         # a[0]
-    mv a1, s2         # a[1]
-    call add          # a[1] = add(a[0], a[1])
-    mv s2, a0         # 更新 a[1]
-    mv a0, s2         # 打印 a[1]
+    addi s3, s3, 1      # i = i + 1
+    bgt s3, s0, end     # 如果 i > n，结束
+    mv s4, s2           # t = a[1]
+    add s2, s1, s2      # a[1] = a[0] + a[1]
+    mv a0, s2           # 打印 a[1]
     call print
-    mv s1, s4         # a[0] = t
-    mv a0, s3         # i
-    li a1, 1
-    call add          # i = add(i, 1)
-    mv s3, a0         # 更新 i
+    # 打印换行符
+    li a0, 10           # '\n' 的 ASCII 码
+    call putch
+    mv s1, s4           # a[0] = t
     j loop
 
 end:
